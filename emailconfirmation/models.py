@@ -16,16 +16,17 @@ from emailconfirmation.signals import email_confirmed
 
 # this code based in-part on django-registration
 
-class EmailAddressManager(models.Manager):
-
-    def add_email(self, user, email):
+class EmailManager(models.Manager):
+    def add_object(self, *args, **kwargs):
         try:
-            email_address = self.create(user=user, email=email)
-            EmailConfirmation.objects.send_confirmation(email_address)
-            return email_address
+            obj = self.create(*args, **kwargs)
+            EmailConfirmation.objects.send_confirmation(obj)
+            return obj
         except IntegrityError:
             return None
 
+
+class EmailAddressManager(EmailManager):
     def get_primary(self, user):
         try:
             return self.get(user=user, primary=True)
@@ -41,14 +42,15 @@ class EmailAddressManager(models.Manager):
         return [address.user for address in EmailAddress.objects.filter(
             verified=True, email=email)]
 
-class EmailAddress(models.Model):
-
-    user = models.ForeignKey(User)
-    email = models.EmailField()
+class EmailAddressBase(models.Model):
     verified = models.BooleanField(default=False)
+    email = models.EmailField()
+    objects = EmailAddressManager()
+    
+class EmailAddress(EmailAddressBase):
+    user = models.ForeignKey(User)
     primary = models.BooleanField(default=False)
 
-    objects = EmailAddressManager()
 
     def set_as_primary(self, conditional=False):
         old_primary = EmailAddress.objects.get_primary(self.user)
@@ -76,7 +78,7 @@ class EmailAddress(models.Model):
 
 class EmailConfirmationManager(models.Manager):
 
-    def confirm_email(self, confirmation_key):
+    def confirm(self, confirmation_key):
         try:
             confirmation = self.get(confirmation_key=confirmation_key)
         except self.model.DoesNotExist:
@@ -108,11 +110,18 @@ class EmailConfirmationManager(models.Manager):
             path
         )
         context = {
-            "user": email_address.user,
+#            "user": email_address.user,
             "activate_url": activate_url,
             "current_site": current_site,
             "confirmation_key": confirmation_key,
         }
+		
+		# add all fields from email_address to context
+		fields = [x.name for x in email_address._meta.fields]
+		fields.remove('verified')
+		for field in fields:
+			context[field] = getattr(email_address, field)
+        
         subject = render_to_string(
             "emailconfirmation/email_confirmation_subject.txt", context)
         # remove superfluous line breaks
@@ -131,18 +140,18 @@ class EmailConfirmationManager(models.Manager):
                 confirmation.delete()
 
 class EmailConfirmation(models.Model):
-
-    email_address = models.ForeignKey(EmailAddress)
     sent = models.DateTimeField()
     confirmation_key = models.CharField(max_length=40)
-
+    email_address = models.ForeignKey(EmailAddress)
+    
     objects = EmailConfirmationManager()
 
     def key_expired(self):
         expiration_date = self.sent + timedelta(
-            days=settings.EMAIL_CONFIRMATION_DAYS)
+            days=settings.CONFIRMATION_EXPIRE_AFTER_DAYS)
         return expiration_date <= datetime.now()
     key_expired.boolean = True
+
 
     def __unicode__(self):
         return u"confirmation for %s" % self.email_address
@@ -150,3 +159,7 @@ class EmailConfirmation(models.Model):
     class Meta:
         verbose_name = _("e-mail confirmation")
         verbose_name_plural = _("e-mail confirmations")
+    
+
+
+

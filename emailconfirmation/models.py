@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+    from datetime import datetime, timedelta
 from random import random
 
 from django.conf import settings
@@ -115,12 +115,12 @@ class EmailConfirmationManager(models.Manager):
             "current_site": current_site,
             "confirmation_key": confirmation_key,
         }
-		
-		# add all fields from email_address to context
-		fields = [x.name for x in email_address._meta.fields]
-		fields.remove('verified')
-		for field in fields:
-			context[field] = getattr(email_address, field)
+        
+        # add all fields from email_address to context
+        fields = [x.name for x in email_address._meta.fields]
+        fields.remove('verified')
+        for field in fields:
+            context[field] = getattr(email_address, field)
         
         subject = render_to_string(
             "emailconfirmation/email_confirmation_subject.txt", context)

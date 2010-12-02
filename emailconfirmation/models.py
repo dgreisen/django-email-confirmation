@@ -52,7 +52,7 @@ class EmailAddress(base.EmailAddressBase):
 
 
 class EmailConfirmation(base.EmailConfirmationBase):
-    email_address = models.ForeignKey("emailconfirmation.models.EmailAddress")
+    email_address = models.ForeignKey(EmailAddress)
 
 
 

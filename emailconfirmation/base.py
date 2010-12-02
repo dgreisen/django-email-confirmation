@@ -73,12 +73,10 @@ class EmailConfirmationManager(models.Manager):
         for field in fields:
             context[field] = getattr(email_address, field)
         
-        subject = render_to_string(
-            "emailconfirmation/email_confirmation_subject.txt", context)
+        subject = render_to_string(self.model._subject_template, context)
         # remove superfluous line breaks
         subject = "".join(subject.splitlines())
-        message = render_to_string(
-            "emailconfirmation/email_confirmation_message.txt", context)
+        message = render_to_string(self.model._message_template, context)
         send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email_address.email])
         return self.create(
             email_address=email_address,
@@ -97,6 +95,8 @@ class EmailConfirmationBase(models.Model):
     
     objects = EmailConfirmationManager()
 
+    _message_template = "emailconfirmation/email_confirmation_message.txt"
+    _subject_template = "emailconfirmation/email_confirmation_subject.txt"
     def key_expired(self):
         expiration_date = self.sent + timedelta(
             days=settings.CONFIRMATION_EXPIRE_AFTER_DAYS)

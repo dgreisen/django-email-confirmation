@@ -25,7 +25,6 @@ class EmailAddressManager(models.Manager):
 
 class EmailAddressBase(models.Model):
     verified = models.BooleanField(default=False)
-    email = models.EmailField()
     objects = EmailAddressManager()
     
 class EmailConfirmationManager(models.Manager):
@@ -95,7 +94,6 @@ class EmailConfirmationManager(models.Manager):
 class EmailConfirmationBase(models.Model):
     sent = models.DateTimeField()
     confirmation_key = models.CharField(max_length=40)
-    email_address = models.ForeignKey("emailconfirmation.models.EmailAddress")
     
     objects = EmailConfirmationManager()
 

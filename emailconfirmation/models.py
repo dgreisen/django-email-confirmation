@@ -25,6 +25,7 @@ class EmailAddressManager(base.EmailAddressManager):
 class EmailAddress(base.EmailAddressBase):
     user = models.ForeignKey(User)
     primary = models.BooleanField(default=False)
+    email = models.EmailField()
 
 
     def set_as_primary(self, conditional=False):

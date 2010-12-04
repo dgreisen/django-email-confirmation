@@ -21,3 +21,35 @@ django-email-confirmation).
 
 This code is based in part on django-registration and is essentially
 a replacement for it where your requirements are different.
+
+
+This app can be use in one of two ways. First, it can be used as a complete solution for email address verification.  Second, it can be used to add verification to an existing or more complex model design.
+
+To use the complete solution:
+
+1) place the emailconfirmation app in your python path
+2) add the emailconfirmation/templates directory to settings.TEMPLATE_DIRS
+3) add emailconfirmation to settings.INSTALLED_APPS
+4) set settings.CONFIRMATION_EXPIRE_AFTER_DAYS to the number of days the 
+   confirmation email should be valid (default is 2 days)
+5) sync the db
+
+To use the mixin solution:
+1) the model that contains the email must derive from 
+   emailconfirmation.base.EmailAddressBase. It must also have either an email
+   field or a function that returns the email.
+2) You must create a model called EmailConfirmation that derives from
+   emailconfirmation.base.EmailConfirmationBase. It must have a ForeignKey
+   field caled email_address that points to the model containing your email 
+   address to be confirmed.
+3) you can override the following atributes on EmailConfirmationBase:
+   a. _message_template - provide a different template path for the 
+      confirmation email message
+   b. _subject_template - provide a different template path for the 
+      confirmation email subject
+   c. _expire_after_days - set number of days a confirmation link is good for
+4) if you wish to customize the email templates, the template will receive a 
+   context that includes all the fields in the email model, an activate_url, 
+   a current_site and a confirmation_key.
+
+emailconfirmation.models.py shows how to do the proper subclassing.

@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 from random import random
+import sys
+import types
 
 from django.conf import settings
 from django.db import models, IntegrityError
@@ -14,7 +16,10 @@ from django.contrib.sites.models import Site
 from emailconfirmation.signals import email_confirmed
 
 class EmailAddressManager(models.Manager):
-    def add_object(self, *args, **kwargs):
+    def add_email(self, *args, **kwargs):
+        econf = '%s.EmailConfirmation'% self.model.__module__
+        __import__(self.model.__module__)
+        EmailConfirmation = sys.modules[self.model.__module__].EmailConfirmation
         try:
             obj = self.create(*args, **kwargs)
             EmailConfirmation.objects.send_confirmation(obj)
@@ -26,10 +31,13 @@ class EmailAddressManager(models.Manager):
 class EmailAddressBase(models.Model):
     verified = models.BooleanField(default=False)
     objects = EmailAddressManager()
-    
+
+    class Meta:
+        abstract = True
+				
 class EmailConfirmationManager(models.Manager):
 
-    def confirm(self, confirmation_key):
+    def confirm_email(self, confirmation_key):
         try:
             confirmation = self.get(confirmation_key=confirmation_key)
         except self.model.DoesNotExist:
@@ -37,14 +45,21 @@ class EmailConfirmationManager(models.Manager):
         if not confirmation.key_expired():
             email_address = confirmation.email_address
             email_address.verified = True
-            email_address.set_as_primary(conditional=True)
+            try:
+                email_address.set_as_primary(conditional=True)
+            except:
+                pass
             email_address.save()
             email_confirmed.send(sender=self.model, email_address=email_address)
             return email_address
 
     def send_confirmation(self, email_address):
         salt = sha_constructor(str(random())).hexdigest()[:5]
-        confirmation_key = sha_constructor(salt + email_address.email).hexdigest()
+        try:
+            email = email_address.email()
+        except:
+            email = email_address.email
+        confirmation_key = sha_constructor(salt + email).hexdigest()
         current_site = Site.objects.get_current()
         # check for the url with the dotted view path
         try:
@@ -72,12 +87,11 @@ class EmailConfirmationManager(models.Manager):
         fields.remove('verified')
         for field in fields:
             context[field] = getattr(email_address, field)
-        
         subject = render_to_string(self.model._subject_template, context)
         # remove superfluous line breaks
         subject = "".join(subject.splitlines())
         message = render_to_string(self.model._message_template, context)
-        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email_address.email])
+        send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email])
         return self.create(
             email_address=email_address,
             sent=datetime.now(),
@@ -97,9 +111,15 @@ class EmailConfirmationBase(models.Model):
 
     _message_template = "emailconfirmation/email_confirmation_message.txt"
     _subject_template = "emailconfirmation/email_confirmation_subject.txt"
+    _expire_after_days = 2
+	
     def key_expired(self):
-        expiration_date = self.sent + timedelta(
-            days=settings.CONFIRMATION_EXPIRE_AFTER_DAYS)
+#        days = settings.CONFIRMATION_EXPIRE_AFTER_DAYS
+        try:
+            days = settings.CONFIRMATION_EXPIRE_AFTER_DAYS
+        except:
+            days = self._expire_after_days
+        expiration_date = self.sent + timedelta(days=days)
         return expiration_date <= datetime.now()
     key_expired.boolean = True
 
@@ -110,4 +130,6 @@ class EmailConfirmationBase(models.Model):
     class Meta:
         verbose_name = _("e-mail confirmation")
         verbose_name_plural = _("e-mail confirmations")
-    
+        abstract = True    
+
+				
